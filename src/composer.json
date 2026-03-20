@@ -1,0 +1,21 @@
+{
+    "require": {
+        "psr/log": "^1.1",
+        "monolog/monolog": "^2.0",
+        "twig/twig": "^3.0",
+        "phpoffice/phpspreadsheet": "^1.13",
+        "illuminate/http": "^7.9",
+        "illuminate/contracts": "7.30.6",
+        "illuminate/container": "7.30.6",
+        "illuminate/filesystem": "7.30.6",
+        "guzzlehttp/guzzle": "^7.7",
+        "dompdf/dompdf": "^2.0",
+        "bacon/bacon-qr-code": "^2.0",
+        "endroid/qr-code": "^4.6",
+        "mobiledetect/mobiledetectlib": "^3.74",
+        "spatie/async": "^1.5",
+        "ramsey/uuid": "^4.2",
+        "khanamiryan/qrcode-detector-decoder": "^1.0",
+        "mhauri/base45": "^0.1.1"
+    }
+}

@@ -1,0 +1,22 @@
+services:
+  lac-hce1:
+    build:
+      context: ./
+      dockerfile: docker_files/Dockerfile-php
+    container_name: lac-hce1
+    restart: always
+    volumes:
+      - ./src:/var/www/html/
+      - ./php/php.ini:/usr/local/etc/php/php.ini
+      - ./apache/log:/var/log/apache2/
+      - ./apache/apache2.conf:/etc/apache2/apache2.conf
+      - ./apache/mods-available/mpm_prefork.conf:/etc/apache2/mods-available/mpm_prefork.conf
+    ports:
+      - 9081:80
+    networks:
+      - app
+
+
+networks:
+  app:
+    driver: bridge

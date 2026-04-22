@@ -197,7 +197,7 @@ class RDAController
         }
 
         // Validar tipo (según tus necesidades)
-        $validTypes = ['HP', 'CL', 'CS', 'HOSPITAL', 'CLINICA']; // Ajusta según necesites
+        $validTypes = ['HG', 'HR', 'HD', 'HP', 'HE', 'HESC', 'IP', 'IPS']; // Ajusta según necesites
         if (isset($organizacion['tipo']) && !in_array($organizacion['tipo'], $validTypes)) {
             $errors[] = "organizacion.tipo: Tipo inválido. Permitidos: " . implode(', ', $validTypes);
         }
@@ -213,7 +213,7 @@ class RDAController
         $errors = [];
         
         foreach ($diagnosticos as $index => $dx) {
-            $requiredFields = ['cie10_code', 'cie10_term', 'status', 'diagnostico_fecha'];
+            $requiredFields = ['cie10_code', 'cie10_term', 'status', 'diagnostico_fecha', 'nota'];
             
             foreach ($requiredFields as $field) {
                 if (!isset($dx[$field]) || empty(trim($dx[$field]))) {
@@ -230,6 +230,11 @@ class RDAController
             if (isset($dx['diagnostico_fecha']) && !$this->validateDate($dx['diagnostico_fecha'])) {
                 $errors[] = "diagnostico[$index].diagnostico_fecha: Formato inválido (debe ser YYYY-MM-DD)";
             }
+
+            // Validar nota
+            if (isset($dx['nota']) && !is_string($dx['nota'])) {
+                $errors[] = "diagnostico[$index].nota: Debe ser una cadena de texto";
+            }
         }
 
         return $errors;
@@ -243,16 +248,24 @@ class RDAController
         $errors = [];
         
         foreach ($alergias as $index => $alergia) {
-            if (!isset($alergia['alergia_term']) || empty(trim($alergia['alergia_term']))) {
-                $errors[] = "alergias[$index].alergia_term: Campo requerido";
-            }
+             $requiredFields = ['alergia_term', 'categoria'];
 
+            foreach ($requiredFields as $field) {
+                if (!isset($alergia[$field]) || empty(trim($alergia[$field]))) {
+                    $errors[] = "alergias[$index].$field: Campo requerido";
+                }
+            }
             // Validar categoría si existe
             if (isset($alergia['categoria'])) {
-                $validCategories = ['medicamento', 'alimento', 'ambiente', 'otro'];
+                $validCategories = ['medicamento', 'alimento', 'animal', 'otro'];
                 if (!in_array($alergia['categoria'], $validCategories)) {
                     $errors[] = "alergias[$index].categoria: Categoría inválida";
                 }
+            }
+
+            // Validar termino de alergia
+            if (isset($alergia['alergia_term']) && !is_string($alergia['alergia_term'])) {
+                $errors[] = "alergias[$index].alergia_term: Debe ser una cadena de texto";
             }
         }
 
@@ -267,7 +280,7 @@ class RDAController
         $errors = [];
         
         foreach ($medicamentos as $index => $med) {
-            $requiredFields = ['medicamento_term', 'medicamento_fecha'];
+            $requiredFields = ['medicamento_term', 'medicamento_fecha', 'medicamento_dosis', 'medicamento_via'];
             
             foreach ($requiredFields as $field) {
                 if (!isset($med[$field]) || empty(trim($med[$field]))) {

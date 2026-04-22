@@ -47,12 +47,7 @@ class Practitioner
             ],
             "text" => [
                 "status" => "generated",
-                "div" => "<div xmlns=\"http://www.w3.org/1999/xhtml\">
-                            <p class=\"res-header-id\"><b>Generated Narrative: Practitioner</b></p>
-                            <div style=\"background-color: #e6e6ff; padding: 10px; border: 1px solid #661aff;\">
-                            {$nombreCompleto} ( Cédula de Identidad: {$documento} )
-                            </div>
-                        </div>"
+                "div" => "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p class=\"res-header-id\"><b>Generated Narrative: Practitioner</b></p><div style=\"background-color: #e6e6ff; padding: 10px; border: 1px solid #661aff;\">{$nombreCompleto} ( Cédula de Identidad: {$documento} )</div></div>"
             ],
             'identifier' => [
                 [

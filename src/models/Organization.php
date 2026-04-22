@@ -34,18 +34,7 @@ class Organization
             ],
             "text" => [
                 "status" => "generated",
-                "div" => "<div xmlns=\"http://www.w3.org/1999/xhtml\">
-                            <p class=\"res-header-id\"><b>Generated Narrative: Organization {$codigo}</b></p>
-                            <a name=\"{$codigo}\"> </a>
-                            <a name=\"hc{$codigo}\"> </a>
-                            <div style=\"display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%\">
-                            <p style=\"margin-bottom: 0px\"/>
-                            <p style=\"margin-bottom: 0px\">Profile: <a href=\"StructureDefinition-OrganizacionPy.html\">Organizacion Paraguay</a></p>
-                            </div>
-                            <p><b>identifier</b>: {$codigo}</p>
-                            <p><b>type</b>: <span title=\"Codes:\">{$tipo}</span></p>
-                            <p><b>name</b>: {$nombreMayusculas}</p>
-                            </div>"
+                "div" => "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p class=\"res-header-id\"><b>Generated Narrative: Organization {$codigo}</b></p><a name=\"{$codigo}\"> </a><a name=\"hc{$codigo}\"> </a><div style=\"display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%\"><p style=\"margin-bottom: 0px\"/><p style=\"margin-bottom: 0px\">Profile: <a href=\"StructureDefinition-OrganizacionPy.html\">Organizacion Paraguay</a></p></div><p><b>identifier</b>: {$codigo}</p><p><b>type</b>: <span title=\"Codes:\">{$tipo}</span></p><p><b>name</b>: {$nombreMayusculas}</p></div>"
             ],
             'identifier' => [
                 [                       

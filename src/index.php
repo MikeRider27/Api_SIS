@@ -12,11 +12,13 @@ $routes = [
         '/api/patient' => ['controller' => 'PatientController', 'method' => 'createPatient'],
         '/api/practitioner' => ['controller' => 'PractitionerController', 'method' => 'createPractitioner'],
         '/api/organization' => ['controller' => 'OrganizationController', 'method' => 'createOrganization'],
+        '/api/rda' => ['controller' => 'RDAController', 'method' => 'createRDA'],
     ],
     'OPTIONS' => [
         '/api/patient' => ['controller' => null, 'method' => null],
         '/api/practitioner' => ['controller' => null, 'method' => null],
         '/api/organization' => ['controller' => null, 'method' => null],
+        '/api/rda' => ['controller' => null, 'method' => null],
     ]
 ];
 

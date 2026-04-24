@@ -6,6 +6,8 @@ error_reporting(E_ALL);
 // Inclusión de archivos necesarios
 require_once __DIR__ . '/../models/RDA.php';
 require_once __DIR__ . '/../vendor/autoload.php'; // Cargar autoload de Composer para ramsey/uuid
+require_once __DIR__ . '/../utils/patient.php'; // Cargar utilidades de paciente
+require_once __DIR__ . '/../utils/practitioner.php'; // Cargar utilidades de profesional
 
 use Ramsey\Uuid\Uuid;
 

@@ -3,10 +3,12 @@
 
 require_once __DIR__ . '/core/connection.php';
 
+
 // Configuración de rutas
 $routes = [
     'GET' => [
         '/' => ['controller' => 'UserController', 'method' => 'showLogin'],
+        '/api/patient/{documento}' => ['controller' => 'PatientController', 'method' => 'getPatient'],
     ],
     'POST' => [
         '/api/patient' => ['controller' => 'PatientController', 'method' => 'createPatient'],

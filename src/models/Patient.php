@@ -97,6 +97,17 @@ class Patient
         
         return $fhirPatient;
     }
+
+    public function getByCedula($documento) {
+        // Implementar lógica para buscar paciente por cédula en el servidor FHIR
+        // Esto podría implicar hacer una consulta al endpoint de búsqueda de pacientes
+        // utilizando el identificador con el tipo de documento correspondiente.
+        //Buscamos el ID del paciente en el FHIR Patient
+        $Paciente = buscarPacientePorCedula($documento);
+        return $Paciente;
+    }
 }
+
+
 
 ?>

@@ -7,6 +7,7 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/../models/Patient.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 
+
 use Ramsey\Uuid\Uuid;
 
 class PatientController
@@ -103,12 +104,51 @@ class PatientController
             // Transformar los datos al formato FHIR
             $fhirPatient = $this->patientModel->transform($data);
 
-            // Devolver la respuesta exitosa
-            http_response_code(201); // 201 Created es más adecuado para creación
-            echo json_encode($fhirPatient, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            //Convertir a JSON para enviar al servidor FHIR
+            $patientData = json_encode($fhirPatient, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
+            // Crear el paciente en el servidor FHIR
+            $createResponse = crearPaciente($fhirPatient);
+
+            // Devolver la respuesta exitosa
+            http_response_code(201);
+            echo json_encode([
+                'error' => false,
+                'message' => 'Paciente creado exitosamente',
+                'data' => $createResponse['patient'] ?? null
+            ]);
         } catch (Exception $e) {
             error_log("Error en PatientController::createPatient: " . $e->getMessage());
+            http_response_code(500);
+            echo json_encode([
+                'error' => true,
+                'message' => 'Error interno del servidor',
+                'details' => $e->getMessage() // En producción, quita esto o solo en modo debug
+            ]);
+        }
+    }
+
+    public function getPatient($documento)
+    {
+        // Configurar headers para API
+        header('Content-Type: application/json');
+        header('Access-Control-Allow-Origin: *');
+
+        try {
+            $patient = $this->patientModel->getByCedula($documento);
+
+            if ($patient) {
+                http_response_code(200);
+                echo json_encode($patient);
+            } else {
+                http_response_code(404);
+                echo json_encode([
+                    'error' => true,
+                    'message' => 'Paciente no encontrado'
+                ]);
+            }
+        } catch (Exception $e) {
+            error_log("Error en PatientController::getPatient: " . $e->getMessage());
             http_response_code(500);
             echo json_encode([
                 'error' => true,

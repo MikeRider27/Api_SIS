@@ -10,7 +10,7 @@
 function buscarPractitionerPorCedula($cedula, $options = []) {
     // Configuración por defecto
     $defaults = [
-        'baseUrl' => 'https://fhir-conectaton.mspbs.gov.py/fhir',
+        'baseUrl' => APP_FHIR_SERVER,
         'onDuplicate' => 'first', // 'first', 'newest', 'oldest', 'throw', 'error'
         'timeout' => 30,
         'verifySsl' => true
@@ -166,12 +166,7 @@ function buscarPractitionerPorCedula($cedula, $options = []) {
     ];
 }
 
-/**
- * Extrae datos específicos de un practitioner
- * 
- * @param array $practitioner Recurso Practitioner de FHIR
- * @return array|null Datos extraídos o null si no hay practitioner
- */
+// Función auxiliar para extraer datos específicos del practitioner encontrado
 function extraerDatosPractitioner($practitioner) {
     if (!$practitioner) {
         return null;
@@ -199,81 +194,185 @@ function extraerDatosPractitioner($practitioner) {
     ];
 }
 
-/**
- * Busca un practitioner por ID directamente
- * 
- * @param string $id ID del practitioner
- * @param array $options Opciones de búsqueda
- * @return array Resultado de la búsqueda
- */
-function buscarPractitionerPorId($id, $options = []) {
+
+// Función para crear un nuevo practitioner (si no existe o quieres forzar creación)
+function crearPractitioner($practitionerData, $options = []) {
     $defaults = [
-        'baseUrl' => 'https://fhir-conectaton.mspbs.gov.py/fhir',
+        'baseUrl' => APP_FHIR_SERVER,
         'timeout' => 30,
         'verifySsl' => true
     ];
     
     $options = array_merge($defaults, $options);
-    $url = $options['baseUrl'] . '/Practitioner/' . urlencode($id);
+   
+    // Extraer identificadores del profesional
+    $identifiers = $practitionerData['identifier'] ?? [];
+    if (empty($identifiers)) {
+        return [
+            'success' => false,
+            'error' => 'El profesional no tiene identifier.'
+        ];
+    }
+    
+    // Buscar cédula
+    $targetIdentifier = null;
+    foreach ($identifiers as $identifier) {
+        $typeCode = $identifier['type']['coding'][0]['code'] ?? null;
+        if ($typeCode === '01') {
+            $targetIdentifier = $identifier;
+            break;
+        }
+    }
+    
+    if (!$targetIdentifier) {
+        return [
+            'success' => false,
+            'error' => 'No se encontró identifier con code "01"'
+        ];
+    }
+    
+    $cedulaValue = $targetIdentifier['value'];
+    $debugInfo = [];
+    
+    // ========== PROBAR DIFERENTES ESTRATEGIAS DE BÚSQUEDA ==========
+    
+    $existingPractitionerId = null;
+    $allDuplicates = [];
+    
+    // ESTRATEGIA 1: Búsqueda por código|valor
+    $searchUrl1 = $options['baseUrl'] . '/Practitioner?identifier=' . urlencode('01|' . $cedulaValue);
+    $debugInfo[] = "🔍 Estrategia 1: " . $searchUrl1;
     
     $ch = curl_init();
     curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
+        CURLOPT_URL => $searchUrl1,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => $options['timeout'],
-        CURLOPT_HTTPHEADER => ['Accept: application/json'],
-        CURLOPT_SSL_VERIFYPEER => $options['verifySsl']
+        CURLOPT_HTTPHEADER => ['Accept: application/json']
     ]);
     
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $response1 = curl_exec($ch);
+    $httpCode1 = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     
-    if ($httpCode === 200) {
-        $practitioner = json_decode($response, true);
-        return [
-            'success' => true,
-            'found' => true,
-            'practitioner' => $practitioner,
-            'message' => 'Practitioner encontrado por ID'
-        ];
+    $debugInfo[] = "HTTP Code: $httpCode1";
+    if ($httpCode1 === 200) {
+        $bundle1 = json_decode($response1, true);
+        $total1 = $bundle1['total'] ?? count($bundle1['entry'] ?? []);
+        $debugInfo[] = "Encontrados: $total1";
+        
+        if ($total1 > 0) {
+            $entries = $bundle1['entry'] ?? [];
+            foreach ($entries as $entry) {
+                $practitioner = $entry['resource'] ?? null;
+                if ($practitioner) {
+                    $allDuplicates[] = $practitioner;
+                    $debugInfo[] = "  - ID: " . ($practitioner['id'] ?? 'N/A');
+                }
+            }
+        }
     }
     
-    if ($httpCode === 404) {
-        return [
-            'success' => true,
-            'found' => false,
-            'practitioner' => null,
-            'message' => "No se encontró practitioner con ID: $id"
-        ];
+    // ESTRATEGIA 2: Si no encontró, buscar solo por valor
+    if (empty($allDuplicates)) {
+        $searchUrl2 = $options['baseUrl'] . '/Practitioner?identifier=' . urlencode($cedulaValue);
+        $debugInfo[] = "🔍 Estrategia 2: " . $searchUrl2;
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $searchUrl2,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $options['timeout'],
+            CURLOPT_HTTPHEADER => ['Accept: application/json']
+        ]);
+        
+        $response2 = curl_exec($ch);
+        $httpCode2 = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        $debugInfo[] = "HTTP Code: $httpCode2";
+        if ($httpCode2 === 200) {
+            $bundle2 = json_decode($response2, true);
+            $total2 = $bundle2['total'] ?? count($bundle2['entry'] ?? []);
+            $debugInfo[] = "Encontrados: $total2";
+            
+            if ($total2 > 0) {
+                $entries = $bundle2['entry'] ?? [];
+                foreach ($entries as $entry) {
+                    $practitioner = $entry['resource'] ?? null;
+                    if ($practitioner) {
+                        $allDuplicates[] = $practitioner;
+                        $debugInfo[] = "  - ID: " . ($practitioner['id'] ?? 'N/A');
+                    }
+                }
+            }
+        }
     }
     
-    return [
-        'success' => false,
-        'error' => "Error HTTP: $httpCode",
-        'found' => false,
-        'practitioner' => null
-    ];
-}
-
-/**
- * Crea un nuevo practitioner en el servidor FHIR
- * 
- * @param array $practitionerData Datos del practitioner (formato FHIR)
- * @param array $options Opciones de creación
- * @return array Resultado de la creación
- */
-function crearPractitioner($practitionerData, $options = []) {
-    $defaults = [
-        'baseUrl' => 'https://fhir-conectaton.mspbs.gov.py/fhir',
-        'timeout' => 30,
-        'verifySsl' => true
-    ];
+    // ESTRATEGIA 3: Buscar por identifier con system completo
+    $system = $targetIdentifier['type']['coding'][0]['system'] ?? '';
+    if (empty($allDuplicates) && $system) {
+        $searchUrl3 = $options['baseUrl'] . '/Practitioner?identifier=' . urlencode($system . '|01|' . $cedulaValue);
+        $debugInfo[] = "🔍 Estrategia 3: " . $searchUrl3;
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $searchUrl3,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $options['timeout'],
+            CURLOPT_HTTPHEADER => ['Accept: application/json']
+        ]);
+        
+        $response3 = curl_exec($ch);
+        $httpCode3 = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        $debugInfo[] = "HTTP Code: $httpCode3";
+        if ($httpCode3 === 200) {
+            $bundle3 = json_decode($response3, true);
+            $total3 = $bundle3['total'] ?? count($bundle3['entry'] ?? []);
+            $debugInfo[] = "Encontrados: $total3";
+            
+            if ($total3 > 0) {
+                $entries = $bundle3['entry'] ?? [];
+                foreach ($entries as $entry) {
+                    $practitioner = $entry['resource'] ?? null;
+                    if ($practitioner) {
+                        $allDuplicates[] = $practitioner;
+                        $debugInfo[] = "  - ID: " . ($practitioner['id'] ?? 'N/A');
+                    }
+                }
+            }
+        }
+    }
     
-    $options = array_merge($defaults, $options);
-    $url = $options['baseUrl'] . '/Practitioner';
+    // ========== DECIDIR QUÉ ID USAR ==========
     
+    if (!empty($allDuplicates)) {
+        // Tomar el PRIMER profesional encontrado
+        $existingPractitionerId = $allDuplicates[0]['id'];
+        $debugInfo[] = "✅ Encontrado profesional existente con ID: $existingPractitionerId";
+        $debugInfo[] = "⚠️ IMPORTANTE: Se usaré ESTE ID para ACTUALIZAR";
+        $debugInfo[] = "⚠️ El ID del JSON (" . ($practitionerData['id'] ?? 'ninguno') . ") será IGNORADO";
+        
+        // FORZAR el uso del ID existente
+        $practitionerData['id'] = $existingPractitionerId;
+    } else {
+        $debugInfo[] = "❌ No se encontró profesional existente";
+        $debugInfo[] = "🆕 Se CREARÁ nuevo profesional";
+        
+        // Si no tiene ID, generar uno
+        if (empty($practitionerData['id'])) {
+            $practitionerData['id'] = uniqid();
+            $debugInfo[] = "ID generado: " . $practitionerData['id'];
+        }
+    }
+    
+    // ========== HACER PUT ==========
+    
+    $url = $options['baseUrl'] . '/Practitioner/' . $practitionerData['id'];
     $jsonData = json_encode($practitionerData);
+    $debugInfo[] = "🚀 HACIENDO PUT a: $url";
     
     $ch = curl_init();
     curl_setopt_array($ch, [
@@ -284,28 +383,37 @@ function crearPractitioner($practitionerData, $options = []) {
             'Content-Type: application/json',
             'Accept: application/json'
         ],
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $jsonData,
-        CURLOPT_SSL_VERIFYPEER => $options['verifySsl']
+        CURLOPT_CUSTOMREQUEST => 'PUT',
+        CURLOPT_POSTFIELDS => $jsonData
     ]);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
     
-    if ($httpCode === 201 || $httpCode === 200) {
+    if ($curlError) {
         return [
-            'success' => true,
-            'practitioner' => json_decode($response, true),
-            'message' => 'Practitioner creado exitosamente'
+            'success' => false,
+            'error' => "CURL Error: $curlError",
+            'debug' => $debugInfo
         ];
     }
     
-    return [
-        'success' => false,
-        'error' => "Error HTTP: $httpCode",
-        'response' => $response
-    ];
+    // ========== RESULTADO ==========
+    
+    if ($httpCode === 200 || $httpCode === 201) {
+        $resultPractitioner = json_decode($response, true);
+        
+        return $resultPractitioner;
+    } else {
+        return [
+            'success' => false,
+            'error' => "Error HTTP $httpCode",
+            'response' => $response,
+            'debug' => $debugInfo
+        ];
+    }
 }
 
 ?>

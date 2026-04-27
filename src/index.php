@@ -9,6 +9,11 @@ $routes = [
     'GET' => [
         '/' => ['controller' => 'UserController', 'method' => 'showLogin'],
         '/api/patient/{documento}' => ['controller' => 'PatientController', 'method' => 'getPatient'],
+        '/api/practitioner/{documento}' => ['controller' => 'PractitionerController', 'method' => 'getPractitioner'],
+        '/api/organization/{nit}' => ['controller' => 'OrganizationController', 'method' => 'getOrganization'],
+        '/api/rda/{documento}' => ['controller' => 'RDAController', 'method' => 'getDocumentRDA'],
+        '/api/rda/bundle/{id}' => ['controller' => 'RDAController', 'method' => 'getBundleRDA'],
+
     ],
     'POST' => [
         '/api/patient' => ['controller' => 'PatientController', 'method' => 'createPatient'],

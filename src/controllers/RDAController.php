@@ -8,6 +8,7 @@ require_once __DIR__ . '/../models/RDA.php';
 require_once __DIR__ . '/../vendor/autoload.php'; // Cargar autoload de Composer para ramsey/uuid
 require_once __DIR__ . '/../utils/patient.php'; // Cargar utilidades de paciente
 require_once __DIR__ . '/../utils/practitioner.php'; // Cargar utilidades de profesional
+require_once __DIR__ . '/../utils/rda.php'; // Cargar utilidades de RDA
 
 use Ramsey\Uuid\Uuid;
 
@@ -22,11 +23,6 @@ class RDAController
 
     public function createRDA()
     {
-        header('Content-Type: application/json');
-        header('Access-Control-Allow-Origin: *');
-        header('Access-Control-Allow-Methods: POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type');
-
         // Manejar preflight requests de CORS
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
             http_response_code(200);
@@ -67,9 +63,19 @@ class RDAController
             // Transformar los datos al formato FHIR
             $fhirRDA = $this->rdaModel->transform($data);
 
+            // Convertir el array a JSON para enviar al servidor FHIR
+            $rdaData = json_encode($fhirRDA, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+            // Crear el RDA en el servidor FHIR
+            $createResponse = json_decode(crearRDA($rdaData), true);
+
             // Devolver la respuesta
             http_response_code(200);
-            echo json_encode($fhirRDA, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            echo json_encode([
+                'error' => false,
+                'message' => 'RDA creado exitosamente',
+                'response' => $createResponse
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
         } catch (Exception $e) {
             http_response_code(500);
@@ -315,4 +321,30 @@ class RDAController
         $d = \DateTime::createFromFormat($format, $date);
         return $d && $d->format($format) === $date;
     }
+
+    public function getDocumentRDA($documento)
+    {
+        try {
+            $rdaData = obtenerRDA($documento);
+            http_response_code(200);
+            echo json_encode($rdaData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Error interno del servidor: ' . $e->getMessage()]);
+        }
+    }
+
+    public function getBundleRDA($id)
+    {
+        try {
+            $bundleData = obtenerBundleRDA($id);
+            http_response_code(200);
+            echo json_encode($bundleData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Error interno del servidor: ' . $e->getMessage()]);
+        }
+    }
+
+
 }

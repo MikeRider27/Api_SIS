@@ -5,6 +5,7 @@ error_reporting(E_ALL);
 
 // Inclusión de archivos necesarios
 require_once __DIR__ . '/../models/Patient.php';
+require_once __DIR__ . '/../utils/patient.php'; // Cargar utilidades de paciente
 require_once __DIR__ . '/../vendor/autoload.php';
 
 
@@ -21,15 +22,6 @@ class PatientController
 
     public function createPatient()
     {
-        // Configurar headers para API
-        header('Content-Type: application/json');
-        header('Access-Control-Allow-Origin: *');
-        header('Access-Control-Allow-Methods: POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type');
-
-        // NOTA: El manejo de OPTIONS ya se hace en el router, 
-        // así que aquí no es necesario repetirlo
-
         // Verificar que sea una petición POST
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
@@ -115,7 +107,7 @@ class PatientController
             echo json_encode([
                 'error' => false,
                 'message' => 'Paciente creado exitosamente',
-                'data' => $createResponse['patient'] ?? null
+                'data' => $createResponse
             ]);
         } catch (Exception $e) {
             error_log("Error en PatientController::createPatient: " . $e->getMessage());
@@ -130,10 +122,6 @@ class PatientController
 
     public function getPatient($documento)
     {
-        // Configurar headers para API
-        header('Content-Type: application/json');
-        header('Access-Control-Allow-Origin: *');
-
         try {
             $patient = $this->patientModel->getByCedula($documento);
 

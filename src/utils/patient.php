@@ -190,17 +190,184 @@ function extraerDatosPaciente($patient) {
 }
 
 // Función para crear un nuevo paciente (si no existe o quieres forzar creación)
-function crearPaciente($pacienteData, $options = []) {
+function crearPaciente($pacienteData, $options = []) {   
     $defaults = [
         'baseUrl' => APP_FHIR_SERVER,
         'timeout' => 30,
-        'verifySsl' => true
+        'verifySsl' => true,
+        'debug' => true
     ];
     
     $options = array_merge($defaults, $options);
-    $url = $options['baseUrl'] . '/Patient';
     
+    // Extraer identificadores del paciente
+    $identifiers = $pacienteData['identifier'] ?? [];
+    if (empty($identifiers)) {
+        return [
+            'success' => false,
+            'error' => 'El paciente no tiene identifier.'
+        ];
+    }
+    
+    // Buscar cédula
+    $targetIdentifier = null;
+    foreach ($identifiers as $identifier) {
+        $typeCode = $identifier['type']['coding'][0]['code'] ?? null;
+        if ($typeCode === '01') {
+            $targetIdentifier = $identifier;
+            break;
+        }
+    }
+    
+    if (!$targetIdentifier) {
+        return [
+            'success' => false,
+            'error' => 'No se encontró identifier con code "01"'
+        ];
+    }
+    
+    $cedulaValue = $targetIdentifier['value'];
+    $debugInfo = [];
+    
+    // ========== PROBAR DIFERENTES ESTRATEGIAS DE BÚSQUEDA ==========
+    
+    $existingPatientId = null;
+    $allDuplicates = [];
+    
+    // ESTRATEGIA 1: Búsqueda por código|valor
+    $searchUrl1 = $options['baseUrl'] . '/Patient?identifier=' . urlencode('01|' . $cedulaValue);
+    $debugInfo[] = "🔍 Estrategia 1: " . $searchUrl1;
+    
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $searchUrl1,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => $options['timeout'],
+        CURLOPT_HTTPHEADER => ['Accept: application/json']
+    ]);
+    
+    $response1 = curl_exec($ch);
+    $httpCode1 = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    $debugInfo[] = "HTTP Code: $httpCode1";
+    if ($httpCode1 === 200) {
+        $bundle1 = json_decode($response1, true);
+        $total1 = $bundle1['total'] ?? count($bundle1['entry'] ?? []);
+        $debugInfo[] = "Encontrados: $total1";
+        
+        if ($total1 > 0) {
+            $entries = $bundle1['entry'] ?? [];
+            foreach ($entries as $entry) {
+                $patient = $entry['resource'] ?? null;
+                if ($patient) {
+                    $allDuplicates[] = $patient;
+                    $debugInfo[] = "  - ID: " . ($patient['id'] ?? 'N/A');
+                }
+            }
+        }
+    }
+    
+    // ESTRATEGIA 2: Si no encontró, buscar solo por valor
+    if (empty($allDuplicates)) {
+        $searchUrl2 = $options['baseUrl'] . '/Patient?identifier=' . urlencode($cedulaValue);
+        $debugInfo[] = "🔍 Estrategia 2: " . $searchUrl2;
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $searchUrl2,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $options['timeout'],
+            CURLOPT_HTTPHEADER => ['Accept: application/json']
+        ]);
+        
+        $response2 = curl_exec($ch);
+        $httpCode2 = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        $debugInfo[] = "HTTP Code: $httpCode2";
+        if ($httpCode2 === 200) {
+            $bundle2 = json_decode($response2, true);
+            $total2 = $bundle2['total'] ?? count($bundle2['entry'] ?? []);
+            $debugInfo[] = "Encontrados: $total2";
+            
+            if ($total2 > 0) {
+                $entries = $bundle2['entry'] ?? [];
+                foreach ($entries as $entry) {
+                    $patient = $entry['resource'] ?? null;
+                    if ($patient) {
+                        $allDuplicates[] = $patient;
+                        $debugInfo[] = "  - ID: " . ($patient['id'] ?? 'N/A');
+                    }
+                }
+            }
+        }
+    }
+    
+    // ESTRATEGIA 3: Buscar por identifier con system completo
+    $system = $targetIdentifier['type']['coding'][0]['system'] ?? '';
+    if (empty($allDuplicates) && $system) {
+        $searchUrl3 = $options['baseUrl'] . '/Patient?identifier=' . urlencode($system . '|01|' . $cedulaValue);
+        $debugInfo[] = "🔍 Estrategia 3: " . $searchUrl3;
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $searchUrl3,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $options['timeout'],
+            CURLOPT_HTTPHEADER => ['Accept: application/json']
+        ]);
+        
+        $response3 = curl_exec($ch);
+        $httpCode3 = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        $debugInfo[] = "HTTP Code: $httpCode3";
+        if ($httpCode3 === 200) {
+            $bundle3 = json_decode($response3, true);
+            $total3 = $bundle3['total'] ?? count($bundle3['entry'] ?? []);
+            $debugInfo[] = "Encontrados: $total3";
+            
+            if ($total3 > 0) {
+                $entries = $bundle3['entry'] ?? [];
+                foreach ($entries as $entry) {
+                    $patient = $entry['resource'] ?? null;
+                    if ($patient) {
+                        $allDuplicates[] = $patient;
+                        $debugInfo[] = "  - ID: " . ($patient['id'] ?? 'N/A');
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== DECIDIR QUÉ ID USAR ==========
+    
+    if (!empty($allDuplicates)) {
+        // Tomar el PRIMER paciente encontrado
+        $existingPatientId = $allDuplicates[0]['id'];
+        $debugInfo[] = "✅ Encontrado paciente existente con ID: $existingPatientId";
+        $debugInfo[] = "⚠️ IMPORTANTE: Se usaré ESTE ID para ACTUALIZAR";
+        $debugInfo[] = "⚠️ El ID del JSON (" . ($pacienteData['id'] ?? 'ninguno') . ") será IGNORADO";
+        
+        // FORZAR el uso del ID existente
+        $pacienteData['id'] = $existingPatientId;
+    } else {
+        $debugInfo[] = "❌ No se encontró paciente existente";
+        $debugInfo[] = "🆕 Se CREARÁ nuevo paciente";
+        
+        // Si no tiene ID, generar uno
+        if (empty($pacienteData['id'])) {
+            $pacienteData['id'] = uniqid();
+            $debugInfo[] = "ID generado: " . $pacienteData['id'];
+        }
+    }
+    
+    // ========== HACER PUT ==========
+    
+    $url = $options['baseUrl'] . '/Patient/' . $pacienteData['id'];
     $jsonData = json_encode($pacienteData);
+    $debugInfo[] = "🚀 HACIENDO PUT a: $url";
     
     $ch = curl_init();
     curl_setopt_array($ch, [
@@ -211,26 +378,35 @@ function crearPaciente($pacienteData, $options = []) {
             'Content-Type: application/json',
             'Accept: application/json'
         ],
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $jsonData       
+        CURLOPT_CUSTOMREQUEST => 'PUT',
+        CURLOPT_POSTFIELDS => $jsonData
     ]);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
     
-    if ($httpCode === 201 || $httpCode === 200) {
+    if ($curlError) {
         return [
-            'success' => true,
-            'patient' => json_decode($response, true),
-            'message' => 'Paciente creado exitosamente'
+            'success' => false,
+            'error' => "CURL Error: $curlError",
+            'debug' => $debugInfo
         ];
     }
     
-    return [
-        'success' => false,
-        'error' => "Error HTTP: $httpCode",
-        'response' => $response
-    ];
+    // ========== RESULTADO ==========
+    
+    if ($httpCode === 200 || $httpCode === 201) {
+        $resultPatient = json_decode($response, true);
+        
+        return $resultPatient;
+    } else {
+        return [
+            'success' => false,
+            'error' => "Error HTTP $httpCode",
+            'response' => $response,
+            'debug' => $debugInfo
+        ];
+    }
 }
-

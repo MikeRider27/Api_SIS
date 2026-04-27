@@ -87,15 +87,13 @@ class Practitioner
         return $d && $d->format($format) === $date;
     }
 
-    /**
-     * Normaliza texto (elimina espacios extras, convierte a mayúsculas)
-     * 
-     * @param string $text Texto a normalizar
-     * @return string
-     */
-    private function normalizeText($text)
+    public function getByCedula($documento)
     {
-        return trim(mb_strtoupper($text, 'UTF-8'));
+        // Aquí podrías implementar la lógica para buscar el practitioner en tu base de datos local
+        // o directamente consultar al servidor FHIR usando el documento como filtro.
+        // Por simplicidad, este método solo devuelve null (no encontrado).
+        $Profesional = buscarPractitionerPorCedula($documento);
+        return $Profesional;
     }
 }
 ?>

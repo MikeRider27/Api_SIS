@@ -52,28 +52,6 @@ class Organization
         return $fhirOrganization;
     }
 
-    /**
-     * Valida el formato de fecha
-     * 
-     * @param string $date Fecha a validar
-     * @param string $format Formato esperado
-     * @return bool
-     */
-    private function validateDate($date, $format = 'Y-m-d')
-    {
-        $d = DateTime::createFromFormat($format, $date);
-        return $d && $d->format($format) === $date;
-    }
-
-    /**
-     * Normaliza texto (elimina espacios extras, convierte a mayúsculas)
-     * 
-     * @param string $text Texto a normalizar
-     * @return string
-     */
-    private function normalizeText($text)
-    {
-        return trim(mb_strtoupper($text, 'UTF-8'));
-    }
+ 
 }
 ?>

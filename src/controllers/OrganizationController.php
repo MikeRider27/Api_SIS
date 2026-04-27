@@ -4,6 +4,7 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../models/Organization.php';
+require_once __DIR__ . '/../utils/organization.php'; // Cargar utilidades de organization
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Ramsey\Uuid\Uuid;
@@ -31,12 +32,6 @@ class OrganizationController
 
     public function createOrganization()
     {
-        // Configurar headers para API
-        header('Content-Type: application/json');
-        header('Access-Control-Allow-Origin: *');
-        header('Access-Control-Allow-Methods: POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type');
-
         // Verificar que sea una petición POST
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
@@ -105,16 +100,22 @@ class OrganizationController
             exit();
         }
 
-        try {
-            // Agregar la descripción del tipo a los datos para usarla en el modelo si es necesario
-            $data['tipo_descripcion'] = $this->validTypes[$tipoUpper];
-            
+        try {                       
             // Transformar los datos al formato FHIR
             $fhirOrganization = $this->organizationModel->transform($data);
 
+            // Convertir el array a JSON para enviar al servidor FHIR
+            $organizationData = json_encode($fhirOrganization, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+            // Crear la organización en el servidor FHIR
+            $createResponse = crearOrganizacion($fhirOrganization);
             // Devolver la respuesta exitosa
             http_response_code(201);
-            echo json_encode($fhirOrganization, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            echo json_encode([
+                'error' => false,
+                'message' => 'Organización creada exitosamente',
+                'data' => $createResponse
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
         } catch (Exception $e) {
             error_log("Error en OrganizationController::createOrganization: " . $e->getMessage());

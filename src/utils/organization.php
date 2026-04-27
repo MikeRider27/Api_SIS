@@ -255,3 +255,30 @@ function crearOrganizacion($organizationData, $options = []) {
         ];
     }
 }
+
+function buscarOrganizacionPorIdentificador($identifier) {
+    $searchUrl = APP_FHIR_SERVER . '/Organization?identifier=' . urlencode($identifier);
+    
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $searchUrl,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTPHEADER => ['Accept: application/json']
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        $bundle = json_decode($response, true);
+        $total = $bundle['total'] ?? count($bundle['entry'] ?? []);
+        
+        if ($total > 0) {
+            return $bundle['entry'][0]['resource'] ?? null;
+        }
+    }
+    
+    return null;
+}

@@ -127,5 +127,34 @@ class OrganizationController
             ]);
         }
     }
+
+    function getOrganization($identifier) {
+            try {
+            $organization = $this->organizationModel->getByIdentifier($identifier);
+
+            if ($organization) {
+                http_response_code(200);
+                echo json_encode([
+                    'error' => false,
+                    'message' => 'Organización encontrada',
+                    'data' => $organization
+                ]);
+            } else {
+                http_response_code(404);
+                echo json_encode([
+                    'error' => true,
+                    'message' => 'Organizacion no encontrado'
+                ]);
+            }
+        } catch (Exception $e) {
+            error_log("Error en OrganizationController::getOrganizationByIdentifier: " . $e->getMessage());
+            http_response_code(500);
+            echo json_encode([
+                'error' => true,
+                'message' => 'Error interno del servidor',
+                'details' => $e->getMessage() // En producción, quita esto o solo en modo debug
+            ]);
+        }     
+    }
 }
 ?>

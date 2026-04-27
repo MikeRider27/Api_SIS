@@ -52,6 +52,13 @@ class Organization
         return $fhirOrganization;
     }
 
+    public function getByIdentifier($identifier) {
+        // Aquí puedes implementar la lógica para buscar la organización por su identificador
+        $organizacion = buscarOrganizacionPorIdentificador($identifier);
+
+        return $organizacion;
+    }
+
  
 }
 ?>

@@ -251,10 +251,18 @@ function simplifyBundle($bundle) {
     return $simplified;
 }
 
+/**
+ * Obtiene un Bundle FHIR y lo simplifica al formato requerido
+ * 
+ * @param string $id ID del Bundle
+ * @return array Respuesta simplificada con los datos estructurados
+ */
 function obtenerBundleRDA($id) {
-    // 1. Obtener Bundle completo desde el servidor FHIR
+    try {
+        // 1. Obtener Bundle completo desde el servidor FHIR
         $fhirUrl = APP_FHIR_SERVER . "/Bundle/$id?_format=json";
         $data = fetchPatientData($fhirUrl);
+        
         if (!$data) {
             return [
                 'error' => true,
@@ -262,15 +270,224 @@ function obtenerBundleRDA($id) {
                 'data' => []
             ];
         }
+        
         $bundle = json_decode($data, true);
-
+        
+        // 2. Simplificar los datos
+        $simplifiedData = simplifyBundleRDA($bundle);
+        
         return [
             'error' => false,
             'message' => 'RDA obtenido exitosamente',
-            'data' => $bundle
+            'data' => $simplifiedData,
+            'fhirData' => $bundle // JSON original del FHIR
         ];
+        
+    } catch (Exception $e) {
+        return [
+            'error' => true,
+            'message' => 'Error al procesar la solicitud: ' . $e->getMessage(),
+            'data' => [],
+            'fhirData' => null
+        ];
+    }
 }
 
+/**
+ * Simplifica el Bundle RDA extrayendo solo la información relevante
+ * 
+ * @param array $bundle Bundle FHIR completo
+ * @return array Datos simplificados y estructurados
+ */
+function simplifyBundleRDA($bundle) {
+    $result = [];
+    
+    if (!isset($bundle['entry'])) {
+        return $result;
+    }
+    
+    // Extraer recursos por tipo
+    $resources = [
+        'Patient' => null,
+        'Practitioner' => null,
+        'Organization' => null,
+        'Condition' => [],
+        'MedicationStatement' => [],
+        'AllergyIntolerance' => []
+    ];
+    
+    foreach ($bundle['entry'] as $entry) {
+        $resource = $entry['resource'] ?? [];
+        $resourceType = $resource['resourceType'] ?? '';
+        
+        switch ($resourceType) {
+            case 'Patient':
+                $resources['Patient'] = $resource;
+                break;
+            case 'Practitioner':
+                $resources['Practitioner'] = $resource;
+                break;
+            case 'Organization':
+                $resources['Organization'] = $resource;
+                break;
+            case 'Condition':
+                $resources['Condition'][] = $resource;
+                break;
+            case 'MedicationStatement':
+                $resources['MedicationStatement'][] = $resource;
+                break;
+            case 'AllergyIntolerance':
+                $resources['AllergyIntolerance'][] = $resource;
+                break;
+        }
+    }
+    
+    // 1. Procesar Paciente
+    if ($resources['Patient']) {
+        $patient = $resources['Patient'];
+        $name = $patient['name'][0] ?? [];
+        
+        // Obtener tipo de documento e identificación
+        $identifier = $patient['identifier'][0] ?? [];
+        $tipoDocumento = $identifier['type']['coding'][0]['code'] ?? null;
+        $documento = $identifier['value'] ?? null;
+        
+        // Separar primer y segundo apellido si hay espacio
+        $fullFamily = $name['family'] ?? null;
+        $primerApellido = $fullFamily;
+        $segundoApellido = null;
+        
+        if ($fullFamily && strpos($fullFamily, ' ') !== false) {
+            $apellidos = explode(' ', $fullFamily, 2);
+            $primerApellido = $apellidos[0];
+            $segundoApellido = $apellidos[1] ?? null;
+        }
+        
+        $result['paciente'] = array_filter([
+            'tipo_documento' => $tipoDocumento,
+            'documento' => $documento,
+            'primer_nombre' => $name['given'][0] ?? null,
+            'segundo_nombre' => $name['given'][1] ?? null,
+            'primer_apellido' => $primerApellido,
+            'segundo_apellido' => $segundoApellido,
+            'fecha_nacimiento' => $patient['birthDate'] ?? null,
+            'sexo' => mapGender($patient['gender'] ?? null)
+        ]);
+    }
+    
+    // 2. Procesar Profesional
+    if ($resources['Practitioner']) {
+        $practitioner = $resources['Practitioner'];
+        $name = $practitioner['name'][0] ?? [];
+        $identifier = $practitioner['identifier'][0] ?? [];
+        
+        // Separar primer y segundo apellido si hay espacio
+        $fullFamily = $name['family'] ?? null;
+        $primerApellido = $fullFamily;
+        $segundoApellido = null;
+        
+        if ($fullFamily && strpos($fullFamily, ' ') !== false) {
+            $apellidos = explode(' ', $fullFamily, 2);
+            $primerApellido = $apellidos[0];
+            $segundoApellido = $apellidos[1] ?? null;
+        }
+        
+        $result['profesional'] = array_filter([
+            'documento' => $identifier['value'] ?? null,
+            'primer_nombre' => $name['given'][0] ?? null,
+            'segundo_nombre' => $name['given'][1] ?? null,
+            'primer_apellido' => $primerApellido,
+            'segundo_apellido' => $segundoApellido
+        ]);
+    }
+    
+    // 3. Procesar Organización
+    if ($resources['Organization']) {
+        $organization = $resources['Organization'];
+        $identifier = $organization['identifier'][0] ?? [];
+        $type = $organization['type'][0] ?? [];
+        
+        $result['organizacion'] = array_filter([
+            'codigo' => $identifier['value'] ?? $organization['id'] ?? null,
+            'tipo' => $type['text'] ?? null,
+            'nombre' => $organization['name'] ?? null
+        ]);
+    }
+    
+    // 4. Procesar Diagnósticos (Condition)
+    foreach ($resources['Condition'] as $condition) {
+        $code = $condition['code']['coding'][0] ?? [];
+        $verificationStatus = $condition['verificationStatus']['coding'][0] ?? [];
+        
+        $diagnostico = [
+            'cie10_code' => $code['code'] ?? null,
+            'cie10_term' => $code['display'] ?? $condition['code']['text'] ?? null,
+            'diagnostico_fecha' => isset($condition['onsetPeriod']['start']) 
+                ? date('Y-m-d', strtotime($condition['onsetPeriod']['start']))
+                : null,
+            'status' => $verificationStatus['code'] ?? null,
+            'nota' => $condition['note'][0]['text'] ?? null
+        ];
+        
+        $result['diagnosticos'][] = array_filter($diagnostico);
+    }
+    
+    // 5. Procesar Medicamentos (MedicationStatement)
+    foreach ($resources['MedicationStatement'] as $medication) {
+        $medicamento = [
+            'medicamento_term' => $medication['medicationCodeableConcept']['text'] ?? null,
+            'medicamento_fecha' => isset($medication['effectiveDateTime'])
+                ? date('Y-m-d', strtotime($medication['effectiveDateTime']))
+                : null,
+            'medicamento_dosis' => $medication['dosage'][0]['text'] ?? null,
+            'medicamento_via' => $medication['dosage'][0]['route']['text'] ?? null
+        ];
+        
+        $result['medicamentos'][] = array_filter($medicamento);
+    }
+    
+    // 6. Procesar Alergias (AllergyIntolerance)
+    foreach ($resources['AllergyIntolerance'] as $allergy) {
+        $categoria = $allergy['category'][0] ?? null;
+        $categoriaMap = [
+            'medication' => 'medicamento',
+            'food' => 'comida',
+            'environment' => 'ambiente',
+            'biologic' => 'biológico'
+        ];
+        
+        $alergia = [
+            'alergia_term' => $allergy['code']['text'] ?? null,
+            'categoria' => $categoriaMap[$categoria] ?? $categoria
+        ];
+        
+        $result['alergias'][] = array_filter($alergia);
+    }
+    
+    // Inicializar arrays vacíos si no existen
+    $result['diagnosticos'] = $result['diagnosticos'] ?? [];
+    $result['medicamentos'] = $result['medicamentos'] ?? [];
+    $result['alergias'] = $result['alergias'] ?? [];
+    
+    return $result;
+}
+
+/**
+ * Mapea el género de FHIR al formato requerido
+ * 
+ * @param string|null $gender Género en FHIR (male, female, other, unknown)
+ * @return string|null Género en español
+ */
+function mapGender($gender) {
+    $map = [
+        'male' => 'masculino',
+        'female' => 'femenino',
+        'other' => 'otro',
+        'unknown' => 'desconocido'
+    ];
+    
+    return $map[$gender] ?? $gender;
+}
 
 
 

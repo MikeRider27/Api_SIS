@@ -114,10 +114,7 @@ class PractitionerController
 
             if ($practitioner) {
                 http_response_code(200);
-                echo json_encode([
-                    'error' => false,
-                    'data' => $practitioner
-                ]);
+                echo json_encode($practitioner);
             } else {
                 http_response_code(404);
                 echo json_encode([

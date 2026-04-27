@@ -134,11 +134,7 @@ class OrganizationController
 
             if ($organization) {
                 http_response_code(200);
-                echo json_encode([
-                    'error' => false,
-                    'message' => 'Organización encontrada',
-                    'data' => $organization
-                ]);
+                echo json_encode($organization);
             } else {
                 http_response_code(404);
                 echo json_encode([

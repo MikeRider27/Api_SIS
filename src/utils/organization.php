@@ -256,29 +256,169 @@ function crearOrganizacion($organizationData, $options = []) {
     }
 }
 
-function buscarOrganizacionPorIdentificador($identifier) {
-    $searchUrl = APP_FHIR_SERVER . '/Organization?identifier=' . urlencode($identifier);
+/**
+ * Busca una organización por su identificador (código)
+ * 
+ * @param string $identifier Identificador de la organización (ej: "0005000.00010102")
+ * @param array $options Configuraciones adicionales
+ * @return array Respuesta estandarizada con la organización encontrada
+ */
+function buscarOrganizacionPorIdentificador($identifier, $options = []) {
+    // Configuración por defecto
+    $defaults = [
+        'baseUrl' => APP_FHIR_SERVER,
+        'onDuplicate' => 'first', // 'first', 'newest', 'oldest', 'throw', 'error'
+        'timeout' => 30,
+        'verifySsl' => true
+    ];
     
+    $options = array_merge($defaults, $options);
+    $url = $options['baseUrl'] . '/Organization?identifier=' . urlencode($identifier);
+    
+    // Inicializar cURL
     $ch = curl_init();
     curl_setopt_array($ch, [
-        CURLOPT_URL => $searchUrl,
+        CURLOPT_URL => $url,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_HTTPHEADER => ['Accept: application/json']
+        CURLOPT_TIMEOUT => $options['timeout'],
+        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        CURLOPT_SSL_VERIFYPEER => $options['verifySsl']
     ]);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
     
-    if ($httpCode === 200) {
-        $bundle = json_decode($response, true);
-        $total = $bundle['total'] ?? count($bundle['entry'] ?? []);
-        
-        if ($total > 0) {
-            return $bundle['entry'][0]['resource'] ?? null;
+    // Manejar errores de conexión
+    if ($response === false) {
+        return [
+            'success' => false,
+            'error' => 'Error de conexión: ' . $curlError,
+            'found' => false,
+            'organization' => null,
+            'duplicates' => []
+        ];
+    }
+    
+    if ($httpCode !== 200) {
+        return [
+            'success' => false,
+            'error' => "Error HTTP: $httpCode",
+            'found' => false,
+            'organization' => null,
+            'duplicates' => []
+        ];
+    }
+    
+    $bundle = json_decode($response, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return [
+            'success' => false,
+            'error' => 'Error al parsear JSON: ' . json_last_error_msg(),
+            'found' => false,
+            'organization' => null,
+            'duplicates' => []
+        ];
+    }
+    
+    $total = $bundle['total'] ?? 0;
+    $entries = $bundle['entry'] ?? [];
+    $organizations = [];
+    
+    // Extraer las organizaciones del bundle
+    foreach ($entries as $entry) {
+        if (isset($entry['resource']) && $entry['resource']['resourceType'] === 'Organization') {
+            $organizations[] = $entry['resource'];
         }
     }
     
-    return null;
+    $count = count($organizations);
+    
+    // Caso 1: No se encontró ninguna organización
+    if ($count === 0) {
+        return [
+            'success' => true,
+            'found' => false,
+            'organization' => null,
+            'duplicates' => [],
+            'message' => "No se encontró ninguna organización con identificador: $identifier"
+        ];
+    }
+    
+    // Caso 2: Se encontró exactamente una organización
+    if ($count === 1) {
+        return [
+            'success' => true,
+            'found' => true,
+            'organization' => $organizations[0],
+            'duplicates' => [],
+            'message' => 'Organización encontrada'
+        ];
+    }
+    
+    // Caso 3: Múltiples organizaciones (duplicados)
+    $selectedOrganization = null;
+    $message = null;
+    
+    switch ($options['onDuplicate']) {
+        case 'first':
+            $selectedOrganization = $organizations[0];
+            $message = "Se encontraron $count organizaciones duplicadas. Usando la primera.";
+            break;
+            
+        case 'newest':
+            // Ordenar por lastUpdated (más reciente primero)
+            usort($organizations, function($a, $b) {
+                $dateA = $a['meta']['lastUpdated'] ?? '1970-01-01';
+                $dateB = $b['meta']['lastUpdated'] ?? '1970-01-01';
+                return strcmp($dateB, $dateA);
+            });
+            $selectedOrganization = $organizations[0];
+            $message = "Se encontraron $count organizaciones duplicadas. Usando la más reciente.";
+            break;
+            
+        case 'oldest':
+            // Ordenar por lastUpdated (más antiguo primero)
+            usort($organizations, function($a, $b) {
+                $dateA = $a['meta']['lastUpdated'] ?? '1970-01-01';
+                $dateB = $b['meta']['lastUpdated'] ?? '1970-01-01';
+                return strcmp($dateA, $dateB);
+            });
+            $selectedOrganization = $organizations[0];
+            $message = "Se encontraron $count organizaciones duplicadas. Usando la más antigua.";
+            break;
+            
+        case 'throw':
+        case 'error':
+            return [
+                'success' => false,
+                'error' => "Se encontraron $count organizaciones duplicadas para el identificador: $identifier",
+                'found' => true,
+                'organization' => null,
+                'duplicates' => $organizations,
+                'message' => 'Múltiples organizaciones encontradas'
+            ];
+            
+        default:
+            // Si es una función callback
+            if (is_callable($options['onDuplicate'])) {
+                $selectedOrganization = call_user_func($options['onDuplicate'], $organizations);
+                $message = "Se encontraron $count organizaciones duplicadas. Se aplicó función personalizada.";
+            } else {
+                $selectedOrganization = $organizations[0];
+                $message = "Se encontraron $count organizaciones duplicadas. Usando la primera por defecto.";
+            }
+            break;
+    }
+    
+    return [
+        'success' => true,
+        'found' => true,
+        'organization' => $selectedOrganization,
+        'duplicates' => $organizations,
+        'duplicateCount' => $count,
+        'message' => $message
+    ];
 }

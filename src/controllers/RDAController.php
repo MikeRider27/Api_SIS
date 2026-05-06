@@ -71,9 +71,10 @@ class RDAController
 
             // Devolver la respuesta
             http_response_code(200);
+
             echo json_encode([
-                'error' => false,
                 'message' => 'RDA creado exitosamente',
+                'request' => $fhirRDA,
                 'response' => $createResponse
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 

@@ -15,7 +15,7 @@ services:
       - 9081:80
     networks:
       - app
-     # Agregar comando post-start para desarrollo
+    # Agregar comando post-start para desarrollo
     command: bash -c "cd /var/www/html && composer install && apache2-foreground"
 
 

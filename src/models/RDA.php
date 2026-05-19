@@ -323,8 +323,7 @@ class RDA
                     "div"    => "<div xmlns=\"http://www.w3.org/1999/xhtml\"><a name=\"DocumentReference_DocumentReferenceEjemploPy2\"> </a><p class=\"res-header-id\"><b>Generated Narrative: DocumentReference DocumentReferenceEjemploPy2</b></p><a name=\"DocumentReferenceEjemploPy2\"> </a><a name=\"hcDocumentReferenceEjemploPy2\"> </a><div style=\"display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%\"><p style=\"margin-bottom: 0px\"/><p style=\"margin-bottom: 0px\">Profile: <a href=\"StructureDefinition-DocumentReferencePy.html\">Referencia de Documentos</a></p></div><p><b>status</b>: Current</p><p><b>type</b>: <span title=\"Codes:{http://loinc.org 34105-7}\">Nota de consulta</span></p><p><b>subject</b>: <a href=\"Bundle-BundleTrancEjemploPy.html#urn-uuid-05d3374b-0278-4d04-93f7-6adc181d5874\">Bundle: type = transaction; timestamp = 2022-03-03 10:30:00+0000</a></p><p><b>date</b>: 2025-09-01 10:30:00+0000</p><p><b>author</b>: <code>PractitionerPy/PractitionerEjemploPy</code></p><p><b>custodian</b>: <a href=\"Organization-OrganizacionEjemploPy.html\">Organization HOSPITAL GENERAL DE CORONEL OVIEDO</a></p><blockquote><p><b>content</b></p><h3>Attachments</h3><table class=\"grid\"><tr><td style=\"display: none\">-</td><td><b>ContentType</b></td><td><b>Url</b></td></tr><tr><td style=\"display: none\">*</td><td>application/fhir+json</td><td><a href=\"Bundle-BundleTrancEjemploPy.html#urn-uuid-d384326c-7c0f-4ac2-ba90-a1d83e5b548f\">Bundle: type = transaction; timestamp = 2022-03-03 10:30:00+0000</a></td></tr></table></blockquote></div>"
                 ],
                 "status"  => "current",
-                "subject" => ["reference" => "urn:uuid:".$pacienteId],
-                 "type" => [
+                "type" => [
                     "coding" => [
                         [
                             "system" => "http://loinc.org", 
